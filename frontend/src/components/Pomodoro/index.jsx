@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import styles from './styles.module.css';
-import{ Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import Confetti from 'react-confetti';
+import axios from 'axios';
 
 const Pomodoro = () => {
-    const handleLogout = () => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("username");
-        window.location.reload();
-        window.location.href = "/login";
-    }
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("username");
+    window.location.reload();
+    window.location.href = "/login";
+  };
 
   const [mode, setMode] = useState('pomodoro');
   const [minutes, setMinutes] = useState(25);
@@ -22,9 +23,8 @@ const Pomodoro = () => {
     shortBreak: 5,
     longBreak: 15
   });
-  const [ showMessage, setShowMessage] = useState(false);
-  
-  const [ congratsMessage, setCongratsMessage] = useState('');
+  const [showMessage, setShowMessage] = useState(false);
+  const [congratsMessage, setCongratsMessage] = useState('');
   const messages = {
     pomodoro: "Well Done! You have completed the Pomodoro session!",
     shortBreak: "You have completed your short break!",
@@ -32,30 +32,45 @@ const Pomodoro = () => {
   };
 
   const modeDurations = {
-    pomodoro: newDurations.pomodoro *60,
-    shortBreak: newDurations.shortBreak*60,
-    longBreak: newDurations.longBreak*60
+    pomodoro: newDurations.pomodoro * 60,
+    shortBreak: newDurations.shortBreak * 60,
+    longBreak: newDurations.longBreak * 60
   };
 
-  const [totalWorkMinutes, setTotalWorkMinutes] = useState(0);
+  const [totalWorkSeconds, setTotalWorkSeconds] = useState(0);
+  const [sessionStartTime, setSessionStartTime] = useState(null);
+  const [elapsedSessionSeconds, setElapsedSessionSeconds] = useState(0);
+  const [currentDate, setCurrentDate] = useState(formatCurrentDate());
 
   useEffect(() => {
     const username = localStorage.getItem('username');
-    const currentDate = new Date().toDateString();
     const todayData = JSON.parse(localStorage.getItem(`${username}_studyTime`)) || {};
-    const savedMinutes = todayData[currentDate] || 0;
+    const savedSeconds = todayData[currentDate] || 0;
 
-    setTotalWorkMinutes(savedMinutes);
-  }, []);
-  
+    setTotalWorkSeconds(savedSeconds);
+
+    // Check for date change every minute
+    const dateInterval = setInterval(() => {
+      const newDate = formatCurrentDate();
+      if (newDate !== currentDate) {
+        setCurrentDate(newDate);
+        setTotalWorkSeconds(0);
+        localStorage.setItem(`${username}_studyTime`, JSON.stringify({ [newDate]: 0 }));
+      }
+    }, 60000); // 60 seconds
+
+    return () => clearInterval(dateInterval);
+  }, [currentDate]);
+
   useEffect(() => {
     let interval = null;
-    const totalDuration= modeDurations[mode];
+    const totalDuration = modeDurations[mode];
 
     if (isActive) {
+      if (!sessionStartTime) {
+        setSessionStartTime(Date.now());
+      }
       interval = setInterval(() => {
-        
-        // when timer completes
         if (seconds === 0) {
           if (minutes === 0) {
             clearInterval(interval);
@@ -69,15 +84,16 @@ const Pomodoro = () => {
         } else {
           setSeconds(seconds - 1);
         }
-        const elapsedTime = totalDuration - (minutes*60 + seconds);
+        const elapsedTime = totalDuration - (minutes * 60 + seconds);
         setProgress((elapsedTime / totalDuration) * 100);
+        setElapsedSessionSeconds(Math.floor((Date.now() - sessionStartTime) / 1000));
       }, 1000);
     } else if (!isActive && seconds !== 0) {
       clearInterval(interval);
     }
 
     return () => clearInterval(interval);
-  }, [isActive, minutes, seconds]);
+  }, [isActive, minutes, seconds, sessionStartTime]);
 
   const handleModeChange = (newMode) => {
     setMode(newMode);
@@ -97,13 +113,25 @@ const Pomodoro = () => {
     setSeconds(0);
     setIsActive(false);
     setProgress(0);
+    setElapsedSessionSeconds(0);
+    setSessionStartTime(null);
   };
 
   const toggleStartStop = () => {
-    setIsActive(!isActive);
+    if (isActive) {
+      updateTotalWorkSeconds();
+      setIsActive(false);
+    } else {
+      setIsActive(true);
+      setSessionStartTime(Date.now());
+    }
   };
 
   const resetTimer = () => {
+    if (isActive) {
+      updateTotalWorkSeconds();
+    }
+    setIsActive(false);
     switch (mode) {
       case 'pomodoro':
         setMinutes(newDurations.pomodoro);
@@ -118,24 +146,50 @@ const Pomodoro = () => {
         break;
     }
     setSeconds(0);
-    setIsActive(false);
     setProgress(0);
+    setElapsedSessionSeconds(0);
+    setSessionStartTime(null);
+  };
+
+  const updateTotalWorkSeconds = () => {
+    if (mode === 'pomodoro') {
+      setTotalWorkSeconds(prevTotal => prevTotal + elapsedSessionSeconds);
+      const username = localStorage.getItem('username');
+      const todayData = JSON.parse(localStorage.getItem(`${username}_studyTime`)) || {};
+      todayData[currentDate] = (todayData[currentDate] || 0) + elapsedSessionSeconds;
+      localStorage.setItem(`${username}_studyTime`, JSON.stringify(todayData));
+
+      // Update user's todaysPomodoroTime in the database
+      const studyTimeInSeconds = todayData[currentDate];
+      axios.put('http://localhost:8080/api/updatepomotime', {
+        date: currentDate,
+        seconds: studyTimeInSeconds,
+        username: username
+      })
+        .then(response => {
+          console.log(response.data);
+        })
+        .catch(error => {
+          console.error('Error updating pomodoro time:', error);
+        });
+      setElapsedSessionSeconds(0);
+    }
   };
 
   const handleChangeDurations = () => {
     setShowPopup(true);
-  }
+  };
 
   const handleClosePopup = () => {
     setShowPopup(false);
-  }
+  };
 
   const handleDurationChange = (e) => {
     const { name, value } = e.target;
     const newValue = Math.max(5, Number(value));
     setNewDurations({
-        ...newDurations,
-        [name]: newValue
+      ...newDurations,
+      [name]: newValue
     });
   };
 
@@ -147,40 +201,62 @@ const Pomodoro = () => {
   const handleMessage = () => {
     setCongratsMessage(messages[mode]);
     setShowMessage(true);
-    setTimeout(() => setShowMessage(false), 10000); //shows message only for 5 seconds
+    setTimeout(() => setShowMessage(false), 10000); 
   };
 
   const handleTimerEnd = () => {
-    if (mode === 'pomodoro'){
-        const workMinutes = newDurations.pomodoro;
-        setTotalWorkMinutes(prevMinutes => prevMinutes + workMinutes);
-        const username = localStorage.getItem('username');
-        const todayData = JSON.parse(localStorage.getItem(`${username}_studyTime`)) || {};
-        const currentDate = new Date().toDateString();
-        todayData[currentDate] = (todayData[currentDate] || 0) + workMinutes;
-        localStorage.setItem(`${username}_studyTime`, JSON.stringify(todayData));
-        
+    if (mode === 'pomodoro') {
+      const workSeconds = newDurations.pomodoro * 60;
+      const username = localStorage.getItem('username');
+      const todayData = JSON.parse(localStorage.getItem(`${username}_studyTime`)) || {};
+      todayData[currentDate] = (todayData[currentDate] || 0) + workSeconds;
+      localStorage.setItem(`${username}_studyTime`, JSON.stringify(todayData));
+
+      // Update user's todaysPomodoroTime in the database
+      const studyTimeInSeconds = todayData[currentDate];
+      axios.put('http://localhost:8080/api/updatepomotime', {
+        date: currentDate,
+        seconds: studyTimeInSeconds,
+        username: username
+      })
+        .then(response => {
+          console.log(response.data);
+        })
+        .catch(error => {
+          console.error('Error updating pomodoro time:', error);
+        });
     }
+    window.location.reload();
   };
 
   const displayStudyTime = () => {
-    const hours = Math.floor(totalWorkMinutes / 60);
-    const minutes = totalWorkMinutes % 60;
-    return `${hours} hours and ${minutes} minutes`;
-};
+    const hours = Math.floor(totalWorkSeconds / 3600);
+    const minutes = Math.floor((totalWorkSeconds % 3600) / 60);
+    const seconds = totalWorkSeconds % 60;
+    return `${hours} hours, ${minutes} minutes, and ${seconds} seconds`;
+  };
+
+  function formatCurrentDate() {
+    const today = new Date();
+    const dd = String(today.getDate()).padStart(2, '0');
+    const mm = String(today.getMonth() + 1).padStart(2, '0'); 
+    const yy = String(today.getFullYear()).slice(-2);
+
+    return `${dd}/${mm}/${yy}`;
+  }
 
   return (
     <main className={styles.app}>
-        <header>
-            <h1>FocusFish <button className={styles.logout_btn} onClick={handleLogout}>Log out</button></h1> 
-            <Link to="/main"><button className={styles.backButton}>Back to Dashboard</button></Link>
-        </header> 
-        {showMessage && (
-                <div className={styles.congratsMessage}>
-                    {congratsMessage}
-                    <Confetti />
-                </div>
-        )}
+      <header>
+        <h1>FocusFish <button className={styles.logout_btn} onClick={handleLogout}>Log out</button></h1>
+        <Link to="/main"><button className={styles.backButton}>Back to Dashboard</button></Link>
+      </header>
+      {showMessage && (
+        <div className={styles.congratsMessage}>
+          {congratsMessage}
+          <Confetti />
+        </div>
+      )}
       <progress id="js-progress" value={progress} max="100"></progress>
       <div className={styles.progressBar}></div>
       <div className={styles.timer}>
@@ -220,36 +296,37 @@ const Pomodoro = () => {
             {isActive ? 'Stop' : 'Start'}
           </button>
           <button className={styles.resetButton} data-action="reset" onClick={resetTimer}>
-          Reset
+            Reset
           </button>
         </div>
-        <button className = {styles.editButton} data-action="edit" onClick={handleChangeDurations}>
-            Edit
-          </button>
+        <button className={styles.editButton} data-action="edit" onClick={handleChangeDurations}>
+          Edit
+        </button>
       </div>
       {showPopup && (
-      <div className={styles.popupContainer}>
-        <div className={styles.popup}>
+        <div className={styles.popupContainer}>
+          <div className={styles.popup}>
             <button className={styles.closeButton} onClick={handleClosePopup}>X</button>
             <h1 className={styles.popupHeading}>Edit Durations</h1>
-            
-                <h3 className={styles.popupHeading}>Pomodoro Duration (minutes):</h3>
+
+            <h3 className={styles.popupHeading}>Pomodoro Duration (minutes):</h3>
             <div >
-                <input className={styles.inputs} type="number" name="pomodoro" value={newDurations.pomodoro} onChange={handleDurationChange} min="5" />
+              <input className={styles.inputs} type="number" name="pomodoro" value={newDurations.pomodoro} onChange={handleDurationChange} min="5" />
             </div>
-                <h3 className={styles.popupHeading}>Short Break Duration (minutes):</h3>
+            <h3 className={styles.popupHeading}>Short Break Duration (minutes):</h3>
             <div >
-                <input className={styles.inputs} type="number" name="shortBreak" value={newDurations.shortBreak} onChange={handleDurationChange} min="5" />
+              <input className={styles.inputs} type="number" name="shortBreak" value={newDurations.shortBreak} onChange={handleDurationChange} min="5" />
             </div>
-                <h3 className={styles.popupHeading}>Long Break Duration (minutes):</h3>
+            <h3 className={styles.popupHeading}>Long Break Duration (minutes):</h3>
             <div >
-                <input className={styles.inputs} type="number" name="longBreak" value={newDurations.longBreak} onChange={handleDurationChange} min="5" />
+              <input className={styles.inputs} type="number" name="longBreak" value={newDurations.longBreak} onChange={handleDurationChange} min="5" />
             </div>
             <button className={styles.saveButton} onClick={handleSaveDurations}>Save</button>
+          </div>
         </div>
-      </div>
       )}
       <div className={styles.dailySummary}>
+        <p>{currentDate}</p>
         <p>Today's total Pomodoro time: {displayStudyTime()}</p>
       </div>
     </main>
