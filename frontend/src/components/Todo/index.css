@@ -1,0 +1,84 @@
+body {
+    color:#000000;
+    font-family: 'Helvetica, Arial, san-serif';
+    font-size: 100%;
+}
+
+.container {
+    margin: 100px auto;
+    max-width: 1000px;
+    width: 80%;
+    height: 700px;
+    padding: 10px;
+    box-shadow: 0 0 10px rgba(123, 176, 223, 0.1);
+    background-color: #7ea9d0;
+    border-radius: 8px;
+  }
+
+.text-left {
+    font-size: 30px;
+    text-align: center;
+}
+
+table, td, tr, th {
+    text-align: center;
+    font-size: 15px;
+    padding: 10px;
+    border: 1px solid;
+    border-color: black;
+    border-collapse: collapse;
+}
+
+th {
+    background-color: #497caf;
+}
+
+tr:hover {background-color: rgb(187, 200, 223);}
+
+table {
+    margin: 50px auto;
+    max-width: 1000px;
+    width: 90%;
+    height: 100px;
+    background-color: aliceblue;
+}
+
+.col-md-5 {
+    width: 300px;
+    height: 150px;
+    padding: 20px;
+    background-color: #497caf;
+    border: 1px solid rgb(255, 255, 255);
+    border-radius: 2px;
+    margin: 0;
+}
+
+.btn {
+    transition-duration: 0.4s;
+}
+      
+.btn:hover {
+    color: white;
+}
+
+
+.btn-danger {
+    background-color: rgb(201, 50, 50);
+    cursor: pointer;
+    padding: 3px 7px;
+    border-radius: 3px;
+}
+
+.btn-primary {
+    background-color:dodgerblue;
+    cursor: pointer;
+    padding: 3px 7px;
+    border-radius: 3px;
+}
+
+.btn-success {
+    background-color:green;
+    cursor: pointer;
+    padding: 3px 7px;
+    border-radius: 3px;
+}
