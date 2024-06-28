@@ -20,8 +20,12 @@ const Main = () => {
         <h2 className={styles.welcome_msg}>Welcome {username}!</h2>
         <p className={styles.tagline}>Keep your Focus, Fish for Success</p>
         <div className={styles.main_container}>
-        <button className={styles.button1}>ToDo</button> <Link to="/Pomodoro"><button className={styles.button2}>Pomodoro</button></Link> <button className={styles.button3}>Calendar</button>
-        <button className={styles.button4}>My Stats</button><button className={styles.button5}>Aquarium</button> <button className={styles.button6}>Help</button>
+        <Link to="/Todo"><button className={styles.button1}>ToDo</button></Link> 
+        <Link to="/Pomodoro"><button className={styles.button2}>Pomodoro</button></Link> 
+        <button className={styles.button3}>Calendar</button>
+        <button className={styles.button4}>My Stats</button>
+        <button className={styles.button5}>Aquarium</button> 
+        <button className={styles.button6}>Help</button>
         </div>
         </div>
     )

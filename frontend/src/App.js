@@ -3,6 +3,7 @@ import Main from './components/Main';
 import Signup from './components/Signup';
 import Login from './components/Login';
 import Pomodoro from './components/Pomodoro';
+import Todo from './components/Todo';
 
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
       <Route path="/signup" exact element={<Signup/>}/>
       <Route path="/login" exact element={<Login/>}/>
       <Route path="/pomodoro" exact element={<Pomodoro/>}/>
+      <Route path="/todo" exact element={<Todo/>}/>
       <Route path="/main" exact element={<Main/>}/>
       <Route path="/" exact element={<Navigate replace to="/login"/>}/>
     </Routes>
